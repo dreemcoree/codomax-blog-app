@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BlogSpace | Home</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body data-page="home">
+  <header class="navbar">
+    <div class="container nav-inner">
+      <a href="index.html" class="logo">BlogSpace</a>
+      <button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="create-blog.html">Create Blog</a></li>
+        <li id="authLinks" style="display:flex;gap:1.5rem">
+          <a href="login.html">Login</a>
+          <a href="register.html" class="btn">Register</a>
+        </li>
+      </ul>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="container">
+        <h1>Share your ideas with the world</h1>
+        <p>Write, publish and discover great stories from developers and creators.</p>
+        <a href="register.html" class="btn">Start Writing</a>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <h2>Latest Posts</h2>
+        <div class="grid" id="blogGrid"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer><div class="container">© 2026 BlogSpace · Codomax Internship project</div></footer>
+  <script src="js/main.js"></script>
+</body>
+</html>

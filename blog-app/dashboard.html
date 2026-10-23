@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BlogSpace | Dashboard</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body data-page="dashboard">
+  <header class="navbar">
+    <div class="container nav-inner">
+      <a href="index.html" class="logo">BlogSpace</a>
+      <button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="create-blog.html">Create Blog</a></li>
+        <li id="authLinks" style="display:flex;gap:1.5rem">
+          <a href="login.html">Login</a>
+          <a href="register.html" class="btn">Register</a>
+        </li>
+      </ul>
+    </div>
+  </header>
+
+  <main class="container dash">
+    <aside class="sidebar">
+      <a href="dashboard.html" class="active">Overview</a>
+      <a href="create-blog.html">Create Blog</a>
+      <a href="index.html">View Site</a>
+    </aside>
+
+    <section>
+      <h2 id="welcome" style="margin-bottom:1rem">Dashboard</h2>
+      <div class="stats">
+        <div class="stat"><strong id="statPosts">0</strong>My posts</div>
+        <div class="stat"><strong id="statAll">0</strong>All posts</div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <h3>My Blogs</h3>
+        <a href="create-blog.html" class="btn">+ New Blog</a>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Title</th><th>Category</th><th>Date</th><th>Action</th></tr></thead>
+          <tbody id="blogRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer><div class="container">© 2026 BlogSpace · Codomax Internship </div></footer>
+  <script src="js/main.js"></script>
+</body>
+</html>
