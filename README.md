@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # BlogSpace – Blog Application (Frontend)
 
 Module 01 of the Codomax Virtual Internship.
