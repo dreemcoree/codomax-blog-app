@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # BlogSpace – Blog Application (Frontend)
 
 Module 01 of the Codomax Virtual Internship.
@@ -18,3 +19,6 @@ HTML5, CSS3 (Flexbox, Grid), JavaScript
 
 ## Screenshots
 (Add your screenshots here)
+=======
+# codomax-blog-app
+>>>>>>> b6f49d4aa87fcb7d2c2876448d8160317ff26c7c
