@@ -1,26 +1,13 @@
-// ===== main.js — shared by all pages =====
-// Data is stored in the browser (localStorage) because Day 1-4 is frontend only.
-// Later modules will replace this with a real backend/database.
+// ===== main.js — shared by all pages (Module 02: talks to the Express API) =====
 
-const store = {
-  get(key, fallback) {
-    try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
-    catch { return fallback; }
-  },
-  set(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
-};
+// Where your backend runs. When you deploy the backend later, change only this line.
+const API_URL = "http://localhost:5000/api";
 
-const sampleBlogs = [
-  { id: 1, title: "Getting Started with HTML", category: "Web Dev", author: "Codomax Team", date: "2026-10-01",
-    content: "HTML is the skeleton of every web page. Learn tags, attributes and semantic elements to build a solid foundation." },
-  { id: 2, title: "CSS Flexbox vs Grid", category: "Web Dev", author: "Codomax Team", date: "2026-10-05",
-    content: "Flexbox is great for one-dimensional layouts, Grid for two-dimensional ones. Use both together for responsive pages." },
-  { id: 3, title: "JavaScript Basics for Beginners", category: "JavaScript", author: "Codomax Team", date: "2026-10-10",
-    content: "Variables, functions, arrays and DOM manipulation: the core ideas you need before moving on to frameworks." }
-];
-
-function getBlogs() { return [...sampleBlogs, ...store.get("blogs", [])]; }
-function getUser() { return store.get("currentUser", null); }
+// ----- Small helpers -----
+function getUser() {
+  try { return JSON.parse(localStorage.getItem("currentUser")); }
+  catch { return null; }
+}
 
 function showMessage(el, text, type) {
   el.textContent = text;
@@ -33,7 +20,23 @@ function escapeHTML(str) {
   return div.innerHTML;
 }
 
-// ----- Mobile menu toggle -----
+// One function for every API call. It returns the JSON or throws a readable error.
+async function api(path, options = {}) {
+  let res;
+  try {
+    res = await fetch(API_URL + path, {
+      headers: { "Content-Type": "application/json" },
+      ...options
+    });
+  } catch {
+    throw new Error("Cannot reach the server. Is the backend running (npm start)?");
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || "Something went wrong.");
+  return data;
+}
+
+// ----- Runs on every page -----
 document.addEventListener("DOMContentLoaded", () => {
   const btn = document.getElementById("menuBtn");
   const links = document.getElementById("navLinks");
@@ -61,39 +64,47 @@ document.addEventListener("DOMContentLoaded", () => {
   if (page === "create") initCreate();
 });
 
-// ----- Home -----
-function renderHome() {
+// ----- Home: show all blogs from the API -----
+async function renderHome() {
   const grid = document.getElementById("blogGrid");
-  grid.innerHTML = getBlogs().slice().reverse().map(b => `
-    <article class="card">
-      <span class="tag">${escapeHTML(b.category)}</span>
-      <h3>${escapeHTML(b.title)}</h3>
-      <p>${escapeHTML(b.content.slice(0, 110))}...</p>
-      <div class="meta">By ${escapeHTML(b.author)} · ${b.date}</div>
-    </article>`).join("");
+  try {
+    const blogs = await api("/blogs");
+    if (!blogs.length) {
+      grid.innerHTML = '<p style="color:var(--muted)">No blogs yet. Be the first to write one!</p>';
+      return;
+    }
+    grid.innerHTML = blogs.slice().reverse().map(b => `
+      <article class="card">
+        <span class="tag">${escapeHTML(b.category)}</span>
+        <h3>${escapeHTML(b.title)}</h3>
+        <p>${escapeHTML(b.content.slice(0, 110))}...</p>
+        <div class="meta">By ${escapeHTML(b.author)} · ${b.date}</div>
+      </article>`).join("");
+  } catch (err) {
+    grid.innerHTML = '<p style="color:var(--muted)">' + escapeHTML(err.message) + "</p>";
+  }
 }
 
 // ----- Register -----
 function initRegister() {
   const form = document.getElementById("registerForm");
   const msg = document.getElementById("msg");
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const name = form.name.value.trim();
-    const email = form.email.value.trim().toLowerCase();
     const password = form.password.value;
-    const confirm = form.confirm.value;
-
     if (password.length < 6) return showMessage(msg, "Password must be at least 6 characters.", "error");
-    if (password !== confirm) return showMessage(msg, "Passwords do not match.", "error");
+    if (password !== form.confirm.value) return showMessage(msg, "Passwords do not match.", "error");
 
-    const users = store.get("users", []);
-    if (users.some(u => u.email === email)) return showMessage(msg, "This email is already registered.", "error");
-
-    users.push({ name, email, password }); // NOTE: plain text only for this demo. Never do this in production.
-    store.set("users", users);
-    showMessage(msg, "Account created! Redirecting to login...", "success");
-    setTimeout(() => (window.location.href = "login.html"), 1200);
+    try {
+      await api("/register", {
+        method: "POST",
+        body: JSON.stringify({ name: form.name.value, email: form.email.value, password })
+      });
+      showMessage(msg, "Account created! Redirecting to login...", "success");
+      setTimeout(() => (window.location.href = "login.html"), 1200);
+    } catch (err) {
+      showMessage(msg, err.message, "error");
+    }
   });
 }
 
@@ -101,43 +112,61 @@ function initRegister() {
 function initLogin() {
   const form = document.getElementById("loginForm");
   const msg = document.getElementById("msg");
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const email = form.email.value.trim().toLowerCase();
-    const user = store.get("users", []).find(u => u.email === email && u.password === form.password.value);
-    if (!user) return showMessage(msg, "Invalid email or password.", "error");
-    store.set("currentUser", { name: user.name, email: user.email });
-    window.location.href = "dashboard.html";
+    try {
+      const data = await api("/login", {
+        method: "POST",
+        body: JSON.stringify({ email: form.email.value, password: form.password.value })
+      });
+      localStorage.setItem("currentUser", JSON.stringify(data.user));
+      window.location.href = "dashboard.html";
+    } catch (err) {
+      showMessage(msg, err.message, "error");
+    }
   });
 }
 
 // ----- Dashboard -----
-function initDashboard() {
+async function initDashboard() {
   const user = getUser();
-  if (!user) { window.location.href = "login.html"; return; } // simple route protection
+  if (!user) { window.location.href = "login.html"; return; }
 
   document.getElementById("welcome").textContent = "Welcome back, " + user.name + "!";
-  const mine = store.get("blogs", []).filter(b => b.email === user.email);
-  document.getElementById("statPosts").textContent = mine.length;
-  document.getElementById("statAll").textContent = getBlogs().length;
-
   const tbody = document.getElementById("blogRows");
-  tbody.innerHTML = mine.length
-    ? mine.map(b => `
-      <tr>
-        <td>${escapeHTML(b.title)}</td>
-        <td>${escapeHTML(b.category)}</td>
-        <td>${b.date}</td>
-        <td><button class="btn btn-danger" data-id="${b.id}">Delete</button></td>
-      </tr>`).join("")
-    : '<tr><td colspan="4">No posts yet. Click "Create Blog" to write your first one.</td></tr>';
 
-  tbody.addEventListener("click", (e) => {
-    const id = e.target.dataset.id;
-    if (!id) return;
-    store.set("blogs", store.get("blogs", []).filter(b => String(b.id) !== id));
-    initDashboard();
-  });
+  try {
+    const [mine, all] = await Promise.all([api("/blogs?authorId=" + user.id), api("/blogs")]);
+    document.getElementById("statPosts").textContent = mine.length;
+    document.getElementById("statAll").textContent = all.length;
+
+    tbody.innerHTML = mine.length
+      ? mine.map(b => `
+        <tr>
+          <td>${escapeHTML(b.title)}</td>
+          <td>${escapeHTML(b.category)}</td>
+          <td>${b.date}</td>
+          <td><button class="btn btn-danger" data-id="${b.id}">Delete</button></td>
+        </tr>`).join("")
+      : '<tr><td colspan="4">No posts yet. Click "Create Blog" to write your first one.</td></tr>';
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="4">' + escapeHTML(err.message) + "</td></tr>";
+  }
+
+  // Attach the delete handler only once
+  if (!tbody.dataset.bound) {
+    tbody.dataset.bound = "1";
+    tbody.addEventListener("click", async (e) => {
+      const id = e.target.dataset.id;
+      if (!id) return;
+      try {
+        await api("/blogs/" + id, { method: "DELETE" });
+        initDashboard();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  }
 }
 
 // ----- Create Blog -----
@@ -147,21 +176,22 @@ function initCreate() {
 
   const form = document.getElementById("blogForm");
   const msg = document.getElementById("msg");
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const blogs = store.get("blogs", []);
-    blogs.push({
-      id: Date.now(),
-      title: form.title.value.trim(),
-      category: form.category.value,
-      content: form.content.value.trim(),
-      author: user.name,
-      email: user.email,
-      date: new Date().toISOString().slice(0, 10)
-    });
-    store.set("blogs", blogs);
-    showMessage(msg, "Blog published! Redirecting...", "success");
-    setTimeout(() => (window.location.href = "dashboard.html"), 1000);
+    try {
+      await api("/blogs", {
+        method: "POST",
+        body: JSON.stringify({
+          title: form.title.value,
+          category: form.category.value,
+          content: form.content.value,
+          authorId: user.id
+        })
+      });
+      showMessage(msg, "Blog published! Redirecting...", "success");
+      setTimeout(() => (window.location.href = "dashboard.html"), 1000);
+    } catch (err) {
+      showMessage(msg, err.message, "error");
+    }
   });
 }
-
