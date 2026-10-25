@@ -1,4 +1,4 @@
-// ===== main.js — shared by all pages (Module 02: talks to the Express API) =====
+// ===== main.js — shared by all pages (talks to the Express + MongoDB API) =====
 
 // Where your backend runs. When you deploy the backend later, change only this line.
 const API_URL = "http://localhost:5000/api";
@@ -62,6 +62,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (page === "login") initLogin();
   if (page === "dashboard") initDashboard();
   if (page === "create") initCreate();
+  if (page === "blog") initBlog();
 });
 
 // ----- Home: show all blogs from the API -----
@@ -76,8 +77,9 @@ async function renderHome() {
     grid.innerHTML = blogs.slice().reverse().map(b => `
       <article class="card">
         <span class="tag">${escapeHTML(b.category)}</span>
-        <h3>${escapeHTML(b.title)}</h3>
+        <h3><a href="blog.html?id=${b.id}">${escapeHTML(b.title)}</a></h3>
         <p>${escapeHTML(b.content.slice(0, 110))}...</p>
+        <a class="read-more" href="blog.html?id=${b.id}">Read more →</a>
         <div class="meta">By ${escapeHTML(b.author)} · ${b.date}</div>
       </article>`).join("");
   } catch (err) {
@@ -143,7 +145,7 @@ async function initDashboard() {
     tbody.innerHTML = mine.length
       ? mine.map(b => `
         <tr>
-          <td>${escapeHTML(b.title)}</td>
+          <td><a href="blog.html?id=${b.id}">${escapeHTML(b.title)}</a></td>
           <td>${escapeHTML(b.category)}</td>
           <td>${b.date}</td>
           <td><button class="btn btn-danger" data-id="${b.id}">Delete</button></td>
@@ -194,4 +196,23 @@ function initCreate() {
       showMessage(msg, err.message, "error");
     }
   });
+}
+
+// ----- Single blog page (blog.html?id=...) -----
+async function initBlog() {
+  const box = document.getElementById("blogDetail");
+  const id = new URLSearchParams(window.location.search).get("id");
+  if (!id) { box.innerHTML = "<p>No blog selected.</p>"; return; }
+
+  try {
+    const b = await api("/blogs/" + id);
+    document.title = "BlogSpace | " + b.title;
+    box.innerHTML = `
+      <span class="tag">${escapeHTML(b.category)}</span>
+      <h1>${escapeHTML(b.title)}</h1>
+      <div class="meta">By ${escapeHTML(b.author)} · ${b.date}</div>
+      <div class="article-body">${escapeHTML(b.content)}</div>`;
+  } catch (err) {
+    box.innerHTML = "<p>" + escapeHTML(err.message) + "</p>";
+  }
 }
