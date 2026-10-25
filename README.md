@@ -1,34 +1,33 @@
-# BlogSpace – Blog Application (Frontend)
+# BlogSpace – Blog Application
 
-Module 01 of the Codomax Virtual Internship: a responsive blog application interface.
+Codomax Virtual Internship project.
 
-Live demo: https://dreemcoree.github.io/codomax-blog-app/
+## Modules completed
+- Module 01: Frontend (HTML, CSS, JavaScript)
+- Module 02: Backend (Node.js, Express.js REST APIs)
 
 ## Features
-- Responsive design for mobile, tablet and desktop
-- 5 pages: Home, Login, Register, Dashboard, Create Blog
-- Form validation with JavaScript
-- Black and crimson theme with smooth animations
-- Data saved in the browser's localStorage (frontend only)
+- Responsive pages: Home, Login, Register, Dashboard, Create Blog
+- REST APIs: register, login, create blog, get blogs, delete blog
+- Passwords are hashed before saving
+- Frontend connected to the backend using fetch
 
-## Technologies Used
-- HTML5
-- CSS3 (Flexbox, Grid, animations, media queries)
-- JavaScript (DOM, localStorage)
+## API Endpoints
+- POST /api/register – create a new user
+- POST /api/login – log in a user
+- POST /api/blogs – create a blog
+- GET /api/blogs – get all blogs (or ?authorId=ID for one user)
+- DELETE /api/blogs/:id – delete a blog
 
-## Project Files
-- index.html – Home page
-- login.html – Login page
-- register.html – Register page
-- dashboard.html – Dashboard page
-- create-blog.html – Create Blog page
-- css/style.css – All styling
-- js/main.js – All JavaScript
+## Technologies
+HTML5, CSS3, JavaScript, Node.js, Express.js
 
 ## How to Run
 1. Clone this repository
-2. Open the folder in VS Code
-3. Right-click index.html and choose "Open with Live Server"
+2. Open a terminal and run: cd backend
+3. Run: npm install
+4. Run: npm start (server runs on http://localhost:5000)
+5. Open index.html with Live Server
 
 ## Author
 Guru Prasath – Codomax Virtual Internship
