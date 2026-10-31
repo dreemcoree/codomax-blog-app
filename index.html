@@ -34,6 +34,17 @@
     <section class="section">
       <div class="container">
         <h2>Latest Posts</h2>
+        <div class="filters">
+          <input type="search" id="searchInput" placeholder="Search blogs by title or content..." />
+          <select id="categoryFilter">
+            <option value="">All categories</option>
+            <option>Web Dev</option>
+            <option>JavaScript</option>
+            <option>Design</option>
+            <option>Career</option>
+            <option>Other</option>
+          </select>
+        </div>
         <div class="grid" id="blogGrid"></div>
       </div>
     </section>

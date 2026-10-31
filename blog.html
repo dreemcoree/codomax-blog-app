@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BlogSpace | Blog</title>
+  <title>BlogSpace | Edit Blog</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
-<body data-page="blog">
+<body data-page="edit">
   <header class="navbar">
     <div class="container nav-inner">
       <a href="index.html" class="logo">BlogSpace</a>
@@ -22,9 +22,35 @@
     </div>
   </header>
 
-  <main class="container section">
-    <a href="index.html" class="back-link">← Back to all blogs</a>
-    <article id="blogDetail" class="article">Loading...</article>
+  <main class="form-wrapper">
+    <div class="form-box wide">
+      <h2>Edit blog</h2>
+      <p class="sub">Change your blog and save.</p>
+      <div id="msg" class="msg"></div>
+      <form id="blogForm">
+        <div class="form-group">
+          <label for="title">Title</label>
+          <input type="text" id="title" name="title" required />
+        </div>
+        <div class="form-group">
+          <label for="category">Category</label>
+          <select id="category" name="category" required>
+            <option value="">Select a category</option>
+            <option>Web Dev</option>
+            <option>JavaScript</option>
+            <option>Design</option>
+            <option>Career</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="content">Content</label>
+          <textarea id="content" name="content" required></textarea>
+        </div>
+        <button type="submit" class="btn">Save changes</button>
+        <a href="dashboard.html" class="btn btn-outline">Cancel</a>
+      </form>
+    </div>
   </main>
 
   <footer><div class="container">© 2026 BlogSpace · Codomax Internship Project</div></footer>

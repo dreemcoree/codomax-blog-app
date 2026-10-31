@@ -1,4 +1,4 @@
-// ===== server.js — Blog API (Module 03: MongoDB) =====
+// ===== server.js — Blog API (Module 04: full CRUD) =====
 require("dotenv").config({ path: require("path").join(__dirname, ".env") });
 const express = require("express");
 const cors = require("cors");
@@ -45,6 +45,11 @@ function formatBlog(b) {
   };
 }
 
+// Make user text safe to use inside a search pattern
+function escapeRegex(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // ----- Routes -----
 app.get("/", (req, res) => res.json({ message: "BlogSpace API is running" }));
 
@@ -81,7 +86,7 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// 3. Create blog
+// CREATE a blog
 app.post("/api/blogs", async (req, res) => {
   try {
     const { title, category, content, authorId } = req.body;
@@ -98,14 +103,23 @@ app.post("/api/blogs", async (req, res) => {
   }
 });
 
-// 4. Get all blogs (or only one author's with ?authorId=)
+// READ all blogs. Optional filters: ?authorId=  ?category=  ?search=
 app.get("/api/blogs", async (req, res) => {
   try {
     const filter = {};
+
     if (req.query.authorId) {
       if (!mongoose.isValidObjectId(req.query.authorId)) return res.json([]);
       filter.author = req.query.authorId;
     }
+    if (req.query.category) {
+      filter.category = req.query.category;
+    }
+    if (req.query.search && req.query.search.trim()) {
+      const pattern = new RegExp(escapeRegex(req.query.search.trim()), "i"); // "i" = ignore capital letters
+      filter.$or = [{ title: pattern }, { content: pattern }];
+    }
+
     const blogs = await Blog.find(filter).sort({ createdAt: 1 });
     res.json(blogs.map(formatBlog));
   } catch (err) {
@@ -113,7 +127,7 @@ app.get("/api/blogs", async (req, res) => {
   }
 });
 
-// 5. Get one blog by id
+// READ one blog
 app.get("/api/blogs/:id", async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: "Blog not found." });
@@ -125,7 +139,29 @@ app.get("/api/blogs/:id", async (req, res) => {
   }
 });
 
-// 6. Delete blog
+// UPDATE a blog (only its author can change it)
+app.put("/api/blogs/:id", async (req, res) => {
+  try {
+    const { title, category, content, authorId } = req.body;
+    if (!title || !category || !content || !authorId) return res.status(400).json({ message: "Title, category, content and authorId are required." });
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: "Blog not found." });
+
+    const blog = await Blog.findById(req.params.id);
+    if (!blog) return res.status(404).json({ message: "Blog not found." });
+    if (String(blog.author) !== String(authorId)) return res.status(403).json({ message: "You can only edit your own blogs." });
+
+    blog.title = title.trim();
+    blog.category = category;
+    blog.content = content.trim();
+    await blog.save();
+
+    res.json({ message: "Blog updated.", blog: formatBlog(blog) });
+  } catch (err) {
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+// DELETE a blog
 app.delete("/api/blogs/:id", async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: "Blog not found." });

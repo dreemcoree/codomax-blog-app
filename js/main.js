@@ -20,6 +20,30 @@ function escapeHTML(str) {
   return div.innerHTML;
 }
 
+// Small pop-up message in the corner (upgrade: replaces alert())
+function toast(text, type = "success") {
+  const el = document.createElement("div");
+  el.className = "toast " + type;
+  el.textContent = text;
+  document.body.appendChild(el);
+  setTimeout(() => el.classList.add("hide"), 2500);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// Live word + character counter under a textarea (upgrade)
+function addCounter(textarea) {
+  const info = document.createElement("div");
+  info.className = "counter";
+  textarea.insertAdjacentElement("afterend", info);
+  const update = () => {
+    const words = textarea.value.trim() ? textarea.value.trim().split(/\s+/).length : 0;
+    info.textContent = words + " words · " + textarea.value.length + " characters";
+  };
+  textarea.addEventListener("input", update);
+  update();
+  return update;
+}
+
 // One function for every API call. It returns the JSON or throws a readable error.
 async function api(path, options = {}) {
   let res;
@@ -57,21 +81,54 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const page = document.body.dataset.page;
-  if (page === "home") renderHome();
+  if (page === "home") initHome();
   if (page === "register") initRegister();
   if (page === "login") initLogin();
   if (page === "dashboard") initDashboard();
   if (page === "create") initCreate();
   if (page === "blog") initBlog();
+  if (page === "edit") initEdit();
 });
 
-// ----- Home: show all blogs from the API -----
+// ----- Home: blogs list with search + category filter -----
+function initHome() {
+  renderHome();
+
+  const searchInput = document.getElementById("searchInput");
+  const categoryFilter = document.getElementById("categoryFilter");
+  if (!searchInput || !categoryFilter) return;
+
+  // Wait 300ms after typing stops, so we don't call the API on every key press
+  let timer;
+  searchInput.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(renderHome, 300);
+  });
+  categoryFilter.addEventListener("change", renderHome);
+}
+
 async function renderHome() {
   const grid = document.getElementById("blogGrid");
+  const searchInput = document.getElementById("searchInput");
+  const categoryFilter = document.getElementById("categoryFilter");
+
+  const params = new URLSearchParams();
+  if (searchInput && searchInput.value.trim()) params.set("search", searchInput.value.trim());
+  if (categoryFilter && categoryFilter.value) params.set("category", categoryFilter.value);
+  const query = params.toString() ? "?" + params.toString() : "";
+
   try {
-    const blogs = await api("/blogs");
+    const blogs = await api("/blogs" + query);
+    let count = document.getElementById("resultCount");
+    if (!count) {
+      count = document.createElement("p");
+      count.id = "resultCount";
+      count.className = "result-count";
+      grid.insertAdjacentElement("beforebegin", count);
+    }
+    count.textContent = blogs.length + (blogs.length === 1 ? " blog found" : " blogs found");
     if (!blogs.length) {
-      grid.innerHTML = '<p style="color:var(--muted)">No blogs yet. Be the first to write one!</p>';
+      grid.innerHTML = '<p style="color:var(--muted)">No blogs found.</p>';
       return;
     }
     grid.innerHTML = blogs.slice().reverse().map(b => `
@@ -148,7 +205,10 @@ async function initDashboard() {
           <td><a href="blog.html?id=${b.id}">${escapeHTML(b.title)}</a></td>
           <td>${escapeHTML(b.category)}</td>
           <td>${b.date}</td>
-          <td><button class="btn btn-danger" data-id="${b.id}">Delete</button></td>
+          <td>
+            <a class="btn btn-outline" href="edit-blog.html?id=${b.id}">Edit</a>
+            <button class="btn btn-danger" data-id="${b.id}">Delete</button>
+          </td>
         </tr>`).join("")
       : '<tr><td colspan="4">No posts yet. Click "Create Blog" to write your first one.</td></tr>';
   } catch (err) {
@@ -161,11 +221,13 @@ async function initDashboard() {
     tbody.addEventListener("click", async (e) => {
       const id = e.target.dataset.id;
       if (!id) return;
+      if (!confirm("Delete this blog? This cannot be undone.")) return;
       try {
         await api("/blogs/" + id, { method: "DELETE" });
+        toast("Blog deleted");
         initDashboard();
       } catch (err) {
-        alert(err.message);
+        toast(err.message, "error");
       }
     });
   }
@@ -178,6 +240,7 @@ function initCreate() {
 
   const form = document.getElementById("blogForm");
   const msg = document.getElementById("msg");
+  addCounter(form.content);
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
@@ -207,12 +270,74 @@ async function initBlog() {
   try {
     const b = await api("/blogs/" + id);
     document.title = "BlogSpace | " + b.title;
+    const words = b.content.trim().split(/\s+/).length;
+    const minutes = Math.max(1, Math.ceil(words / 200));
     box.innerHTML = `
       <span class="tag">${escapeHTML(b.category)}</span>
       <h1>${escapeHTML(b.title)}</h1>
-      <div class="meta">By ${escapeHTML(b.author)} · ${b.date}</div>
-      <div class="article-body">${escapeHTML(b.content)}</div>`;
+      <div class="meta">By ${escapeHTML(b.author)} · ${b.date} · ${minutes} min read · ${words} words</div>
+      <div class="article-body">${escapeHTML(b.content)}</div>
+      <button class="btn btn-outline share-btn" id="shareBtn">Copy link</button>`;
+    document.getElementById("shareBtn").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        toast("Link copied");
+      } catch {
+        toast("Could not copy the link", "error");
+      }
+    });
   } catch (err) {
     box.innerHTML = "<p>" + escapeHTML(err.message) + "</p>";
   }
+}
+
+// ----- Edit Blog page (edit-blog.html?id=...) -----
+async function initEdit() {
+  const user = getUser();
+  if (!user) { window.location.href = "login.html"; return; }
+
+  const form = document.getElementById("blogForm");
+  const msg = document.getElementById("msg");
+  const id = new URLSearchParams(window.location.search).get("id");
+  if (!id) { showMessage(msg, "No blog selected.", "error"); return; }
+
+  // 1. Load the current blog and fill the form
+  try {
+    const b = await api("/blogs/" + id);
+    if (String(b.authorId) !== String(user.id)) {
+      showMessage(msg, "You can only edit your own blogs.", "error");
+      form.style.display = "none";
+      return;
+    }
+    form.title.value = b.title;
+    form.category.value = b.category;
+    form.content.value = b.content;
+  } catch (err) {
+    showMessage(msg, err.message, "error");
+    form.style.display = "none";
+    return;
+  }
+
+  const refreshCounter = addCounter(form.content);
+  refreshCounter();
+
+  // 2. Save the changes
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await api("/blogs/" + id, {
+        method: "PUT",
+        body: JSON.stringify({
+          title: form.title.value,
+          category: form.category.value,
+          content: form.content.value,
+          authorId: user.id
+        })
+      });
+      showMessage(msg, "Blog updated! Redirecting...", "success");
+      setTimeout(() => (window.location.href = "dashboard.html"), 1000);
+    } catch (err) {
+      showMessage(msg, err.message, "error");
+    }
+  });
 }
