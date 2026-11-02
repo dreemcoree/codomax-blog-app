@@ -1,14 +1,38 @@
-// ===== main.js — shared by all pages (talks to the Express + MongoDB API) =====
+// ===== main.js — shared by all pages (Module 05: JWT login) =====
 
 // Where your backend runs. When you deploy the backend later, change only this line.
 const API_URL = "http://localhost:5000/api";
 
-// ----- Small helpers -----
+// ----- Session helpers (token + user are kept in the browser) -----
 function getUser() {
   try { return JSON.parse(localStorage.getItem("currentUser")); }
   catch { return null; }
 }
+function getToken() { return localStorage.getItem("token"); }
+function saveSession(token, user) {
+  localStorage.setItem("token", token);
+  localStorage.setItem("currentUser", JSON.stringify(user));
+}
+function clearSession() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("currentUser");
+}
+function logout() {
+  clearSession();
+  window.location.href = "index.html";
+}
 
+// Protect a page: no token means go to Login
+function requireLogin() {
+  if (!getToken() || !getUser()) {
+    clearSession();
+    window.location.href = "login.html";
+    return false;
+  }
+  return true;
+}
+
+// ----- Small helpers -----
 function showMessage(el, text, type) {
   el.textContent = text;
   el.className = "msg " + type;
@@ -20,7 +44,7 @@ function escapeHTML(str) {
   return div.innerHTML;
 }
 
-// Small pop-up message in the corner (upgrade: replaces alert())
+// Small pop-up message in the corner
 function toast(text, type = "success") {
   const el = document.createElement("div");
   el.className = "toast " + type;
@@ -30,7 +54,7 @@ function toast(text, type = "success") {
   setTimeout(() => el.remove(), 3000);
 }
 
-// Live word + character counter under a textarea (upgrade)
+// Live word + character counter under a textarea
 function addCounter(textarea) {
   const info = document.createElement("div");
   info.className = "counter";
@@ -44,18 +68,25 @@ function addCounter(textarea) {
   return update;
 }
 
-// One function for every API call. It returns the JSON or throws a readable error.
+// One function for every API call. It adds the login token automatically.
 async function api(path, options = {}) {
+  const headers = { "Content-Type": "application/json" };
+  const token = getToken();
+  if (token) headers.Authorization = "Bearer " + token;
+
   let res;
   try {
-    res = await fetch(API_URL + path, {
-      headers: { "Content-Type": "application/json" },
-      ...options
-    });
+    res = await fetch(API_URL + path, { ...options, headers });
   } catch {
     throw new Error("Cannot reach the server. Is the backend running (npm start)?");
   }
   const data = await res.json().catch(() => ({}));
+
+  // Token missing, wrong or expired: log out and go to Login
+  if (res.status === 401 && token && path !== "/login") {
+    clearSession();
+    window.location.href = "login.html";
+  }
   if (!res.ok) throw new Error(data.message || "Something went wrong.");
   return data;
 }
@@ -66,17 +97,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const links = document.getElementById("navLinks");
   if (btn) btn.addEventListener("click", () => links.classList.toggle("open"));
 
-  // Swap Login/Register links for Dashboard/Logout when signed in
-  const user = getUser();
+  // Navbar: show Dashboard / Profile / Logout when signed in
   const authLinks = document.getElementById("authLinks");
-  if (authLinks && user) {
+  if (authLinks && getToken() && getUser()) {
     authLinks.innerHTML =
       '<a href="dashboard.html">Dashboard</a>' +
+      '<a href="profile.html">Profile</a>' +
       '<a href="#" id="logoutLink">Logout</a>';
     document.getElementById("logoutLink").addEventListener("click", (e) => {
       e.preventDefault();
-      localStorage.removeItem("currentUser");
-      window.location.href = "index.html";
+      logout();
     });
   }
 
@@ -88,6 +118,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (page === "create") initCreate();
   if (page === "blog") initBlog();
   if (page === "edit") initEdit();
+  if (page === "profile") initProfile();
 });
 
 // ----- Home: blogs list with search + category filter -----
@@ -98,7 +129,6 @@ function initHome() {
   const categoryFilter = document.getElementById("categoryFilter");
   if (!searchInput || !categoryFilter) return;
 
-  // Wait 300ms after typing stops, so we don't call the API on every key press
   let timer;
   searchInput.addEventListener("input", () => {
     clearTimeout(timer);
@@ -167,8 +197,11 @@ function initRegister() {
   });
 }
 
-// ----- Login -----
+// ----- Login: saves the token -----
 function initLogin() {
+  // Already logged in? Skip the login page
+  if (getToken() && getUser()) { window.location.href = "dashboard.html"; return; }
+
   const form = document.getElementById("loginForm");
   const msg = document.getElementById("msg");
   form.addEventListener("submit", async (e) => {
@@ -178,7 +211,7 @@ function initLogin() {
         method: "POST",
         body: JSON.stringify({ email: form.email.value, password: form.password.value })
       });
-      localStorage.setItem("currentUser", JSON.stringify(data.user));
+      saveSession(data.token, data.user);
       window.location.href = "dashboard.html";
     } catch (err) {
       showMessage(msg, err.message, "error");
@@ -186,16 +219,16 @@ function initLogin() {
   });
 }
 
-// ----- Dashboard -----
+// ----- Dashboard (protected): only MY blogs -----
 async function initDashboard() {
+  if (!requireLogin()) return;
   const user = getUser();
-  if (!user) { window.location.href = "login.html"; return; }
 
   document.getElementById("welcome").textContent = "Welcome back, " + user.name + "!";
   const tbody = document.getElementById("blogRows");
 
   try {
-    const [mine, all] = await Promise.all([api("/blogs?authorId=" + user.id), api("/blogs")]);
+    const [mine, all] = await Promise.all([api("/blogs/mine"), api("/blogs")]);
     document.getElementById("statPosts").textContent = mine.length;
     document.getElementById("statAll").textContent = all.length;
 
@@ -215,7 +248,6 @@ async function initDashboard() {
     tbody.innerHTML = '<tr><td colspan="4">' + escapeHTML(err.message) + "</td></tr>";
   }
 
-  // Attach the delete handler only once
   if (!tbody.dataset.bound) {
     tbody.dataset.bound = "1";
     tbody.addEventListener("click", async (e) => {
@@ -233,10 +265,9 @@ async function initDashboard() {
   }
 }
 
-// ----- Create Blog -----
+// ----- Create Blog (protected) -----
 function initCreate() {
-  const user = getUser();
-  if (!user) { window.location.href = "login.html"; return; }
+  if (!requireLogin()) return;
 
   const form = document.getElementById("blogForm");
   const msg = document.getElementById("msg");
@@ -249,8 +280,7 @@ function initCreate() {
         body: JSON.stringify({
           title: form.title.value,
           category: form.category.value,
-          content: form.content.value,
-          authorId: user.id
+          content: form.content.value
         })
       });
       showMessage(msg, "Blog published! Redirecting...", "success");
@@ -291,17 +321,16 @@ async function initBlog() {
   }
 }
 
-// ----- Edit Blog page (edit-blog.html?id=...) -----
+// ----- Edit Blog (protected) -----
 async function initEdit() {
+  if (!requireLogin()) return;
   const user = getUser();
-  if (!user) { window.location.href = "login.html"; return; }
 
   const form = document.getElementById("blogForm");
   const msg = document.getElementById("msg");
   const id = new URLSearchParams(window.location.search).get("id");
   if (!id) { showMessage(msg, "No blog selected.", "error"); return; }
 
-  // 1. Load the current blog and fill the form
   try {
     const b = await api("/blogs/" + id);
     if (String(b.authorId) !== String(user.id)) {
@@ -318,10 +347,8 @@ async function initEdit() {
     return;
   }
 
-  const refreshCounter = addCounter(form.content);
-  refreshCounter();
+  addCounter(form.content);
 
-  // 2. Save the changes
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
@@ -330,14 +357,67 @@ async function initEdit() {
         body: JSON.stringify({
           title: form.title.value,
           category: form.category.value,
-          content: form.content.value,
-          authorId: user.id
+          content: form.content.value
         })
       });
       showMessage(msg, "Blog updated! Redirecting...", "success");
       setTimeout(() => (window.location.href = "dashboard.html"), 1000);
     } catch (err) {
       showMessage(msg, err.message, "error");
+    }
+  });
+}
+
+// ----- Profile (protected) -----
+async function initProfile() {
+  if (!requireLogin()) return;
+
+  const nameForm = document.getElementById("nameForm");
+  const pwForm = document.getElementById("pwForm");
+  const nameMsg = document.getElementById("nameMsg");
+  const pwMsg = document.getElementById("pwMsg");
+
+  async function load() {
+    try {
+      const me = await api("/me");
+      document.getElementById("avatar").textContent = me.name.charAt(0).toUpperCase();
+      document.getElementById("profileName").textContent = me.name;
+      document.getElementById("profileEmail").textContent = me.email;
+      document.getElementById("profileJoined").textContent = me.joined;
+      document.getElementById("profileBlogs").textContent = me.blogCount;
+      nameForm.name.value = me.name;
+    } catch (err) {
+      showMessage(nameMsg, err.message, "error");
+    }
+  }
+  await load();
+
+  document.getElementById("logoutBtn").addEventListener("click", logout);
+
+  nameForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const data = await api("/me", { method: "PUT", body: JSON.stringify({ name: nameForm.name.value }) });
+      localStorage.setItem("currentUser", JSON.stringify(data.user));
+      showMessage(nameMsg, "Name updated.", "success");
+      load();
+    } catch (err) {
+      showMessage(nameMsg, err.message, "error");
+    }
+  });
+
+  pwForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (pwForm.newPassword.value !== pwForm.confirmPassword.value) return showMessage(pwMsg, "New passwords do not match.", "error");
+    try {
+      await api("/me", {
+        method: "PUT",
+        body: JSON.stringify({ currentPassword: pwForm.currentPassword.value, newPassword: pwForm.newPassword.value })
+      });
+      showMessage(pwMsg, "Password changed.", "success");
+      pwForm.reset();
+    } catch (err) {
+      showMessage(pwMsg, err.message, "error");
     }
   });
 }

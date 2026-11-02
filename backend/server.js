@@ -1,14 +1,18 @@
-// ===== server.js — Blog API (Module 04: full CRUD) =====
+// ===== server.js — Blog API (Module 05: JWT authentication) =====
 require("dotenv").config({ path: require("path").join(__dirname, ".env") });
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const User = require("./models/User");
 const Blog = require("./models/Blog");
+const auth = require("./middleware/auth");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+if (!process.env.JWT_SECRET) console.log("WARNING: JWT_SECRET is missing in .env. Login will not work.");
 
 // ----- Middleware -----
 app.use(cors());
@@ -32,7 +36,6 @@ function checkPassword(password, stored) {
   return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(test, "hex"));
 }
 
-// Turn a database blog into the shape the frontend expects
 function formatBlog(b) {
   return {
     id: b._id,
@@ -45,15 +48,14 @@ function formatBlog(b) {
   };
 }
 
-// Make user text safe to use inside a search pattern
 function escapeRegex(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// ----- Routes -----
+// ===================== PUBLIC ROUTES (no login needed) =====================
 app.get("/", (req, res) => res.json({ message: "BlogSpace API is running" }));
 
-// 1. Register
+// Register
 app.post("/api/register", async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -71,7 +73,7 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-// 2. Login
+// Login: checks the password, then gives back a signed token
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -80,46 +82,22 @@ app.post("/api/login", async (req, res) => {
     const user = await User.findOne({ email: email.trim().toLowerCase() });
     if (!user || !checkPassword(password, user.password)) return res.status(401).json({ message: "Invalid email or password." });
 
-    res.json({ message: "Login successful.", user: { id: user._id, name: user.name, email: user.email } });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    res.json({ message: "Login successful.", token, user: { id: user._id, name: user.name, email: user.email } });
   } catch (err) {
     res.status(500).json({ message: "Server error." });
   }
 });
 
-// CREATE a blog
-app.post("/api/blogs", async (req, res) => {
-  try {
-    const { title, category, content, authorId } = req.body;
-    if (!title || !category || !content || !authorId) return res.status(400).json({ message: "Title, category, content and authorId are required." });
-    if (!mongoose.isValidObjectId(authorId)) return res.status(400).json({ message: "Invalid author. Please log out and log in again." });
-
-    const author = await User.findById(authorId);
-    if (!author) return res.status(404).json({ message: "Author not found." });
-
-    const blog = await Blog.create({ title, category, content, author: author._id, authorName: author.name });
-    res.status(201).json({ message: "Blog created.", blog: formatBlog(blog) });
-  } catch (err) {
-    res.status(500).json({ message: "Server error." });
-  }
-});
-
-// READ all blogs. Optional filters: ?authorId=  ?category=  ?search=
+// Read all blogs (public). Optional filters: ?category=  ?search=
 app.get("/api/blogs", async (req, res) => {
   try {
     const filter = {};
-
-    if (req.query.authorId) {
-      if (!mongoose.isValidObjectId(req.query.authorId)) return res.json([]);
-      filter.author = req.query.authorId;
-    }
-    if (req.query.category) {
-      filter.category = req.query.category;
-    }
+    if (req.query.category) filter.category = req.query.category;
     if (req.query.search && req.query.search.trim()) {
-      const pattern = new RegExp(escapeRegex(req.query.search.trim()), "i"); // "i" = ignore capital letters
+      const pattern = new RegExp(escapeRegex(req.query.search.trim()), "i");
       filter.$or = [{ title: pattern }, { content: pattern }];
     }
-
     const blogs = await Blog.find(filter).sort({ createdAt: 1 });
     res.json(blogs.map(formatBlog));
   } catch (err) {
@@ -127,7 +105,19 @@ app.get("/api/blogs", async (req, res) => {
   }
 });
 
-// READ one blog
+// ===================== PROTECTED ROUTES (token required) =====================
+
+// My blogs only (must be BEFORE /api/blogs/:id)
+app.get("/api/blogs/mine", auth, async (req, res) => {
+  try {
+    const blogs = await Blog.find({ author: req.userId }).sort({ createdAt: 1 });
+    res.json(blogs.map(formatBlog));
+  } catch (err) {
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+// Read one blog (public)
 app.get("/api/blogs/:id", async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: "Blog not found." });
@@ -139,35 +129,90 @@ app.get("/api/blogs/:id", async (req, res) => {
   }
 });
 
-// UPDATE a blog (only its author can change it)
-app.put("/api/blogs/:id", async (req, res) => {
+// Create blog: the author comes from the TOKEN, not from the request body
+app.post("/api/blogs", auth, async (req, res) => {
   try {
-    const { title, category, content, authorId } = req.body;
-    if (!title || !category || !content || !authorId) return res.status(400).json({ message: "Title, category, content and authorId are required." });
+    const { title, category, content } = req.body;
+    if (!title || !category || !content) return res.status(400).json({ message: "Title, category and content are required." });
+
+    const author = await User.findById(req.userId);
+    if (!author) return res.status(401).json({ message: "User not found. Please log in again." });
+
+    const blog = await Blog.create({ title, category, content, author: author._id, authorName: author.name });
+    res.status(201).json({ message: "Blog created.", blog: formatBlog(blog) });
+  } catch (err) {
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+// Update blog (owner only)
+app.put("/api/blogs/:id", auth, async (req, res) => {
+  try {
+    const { title, category, content } = req.body;
+    if (!title || !category || !content) return res.status(400).json({ message: "Title, category and content are required." });
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: "Blog not found." });
 
     const blog = await Blog.findById(req.params.id);
     if (!blog) return res.status(404).json({ message: "Blog not found." });
-    if (String(blog.author) !== String(authorId)) return res.status(403).json({ message: "You can only edit your own blogs." });
+    if (String(blog.author) !== String(req.userId)) return res.status(403).json({ message: "You can only edit your own blogs." });
 
     blog.title = title.trim();
     blog.category = category;
     blog.content = content.trim();
     await blog.save();
-
     res.json({ message: "Blog updated.", blog: formatBlog(blog) });
   } catch (err) {
     res.status(500).json({ message: "Server error." });
   }
 });
 
-// DELETE a blog
-app.delete("/api/blogs/:id", async (req, res) => {
+// Delete blog (owner only)
+app.delete("/api/blogs/:id", auth, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: "Blog not found." });
-    const deleted = await Blog.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ message: "Blog not found." });
+    const blog = await Blog.findById(req.params.id);
+    if (!blog) return res.status(404).json({ message: "Blog not found." });
+    if (String(blog.author) !== String(req.userId)) return res.status(403).json({ message: "You can only delete your own blogs." });
+
+    await blog.deleteOne();
     res.json({ message: "Blog deleted." });
+  } catch (err) {
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+// Profile: read
+app.get("/api/me", auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(401).json({ message: "User not found. Please log in again." });
+    const blogCount = await Blog.countDocuments({ author: user._id });
+    res.json({ id: user._id, name: user.name, email: user.email, joined: user.createdAt.toISOString().slice(0, 10), blogCount });
+  } catch (err) {
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+// Profile: change name and/or password
+app.put("/api/me", auth, async (req, res) => {
+  try {
+    const { name, currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(401).json({ message: "User not found. Please log in again." });
+
+    if (name && name.trim()) {
+      user.name = name.trim();
+      await Blog.updateMany({ author: user._id }, { authorName: user.name });
+    }
+
+    if (newPassword) {
+      if (!currentPassword || !checkPassword(currentPassword, user.password)) return res.status(400).json({ message: "Current password is wrong." });
+      if (newPassword.length < 6) return res.status(400).json({ message: "New password must be at least 6 characters." });
+      user.password = hashPassword(newPassword);
+    }
+
+    await user.save();
+    res.json({ message: "Profile updated.", user: { id: user._id, name: user.name, email: user.email } });
   } catch (err) {
     res.status(500).json({ message: "Server error." });
   }

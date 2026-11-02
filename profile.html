@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BlogSpace | Profile</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body data-page="profile">
+  <header class="navbar">
+    <div class="container nav-inner">
+      <a href="index.html" class="logo">BlogSpace</a>
+      <button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="create-blog.html">Create Blog</a></li>
+        <li id="authLinks" style="display:flex;gap:1.5rem">
+          <a href="login.html">Login</a>
+          <a href="register.html" class="btn">Register</a>
+        </li>
+      </ul>
+    </div>
+  </header>
+
+  <main class="container section">
+    <div class="profile-grid">
+      <section class="profile-card">
+        <div class="avatar" id="avatar">?</div>
+        <h2 id="profileName">Loading...</h2>
+        <p class="profile-email" id="profileEmail"></p>
+        <div class="profile-stats">
+          <div><strong id="profileBlogs">0</strong><span>Blogs</span></div>
+          <div><strong id="profileJoined">-</strong><span>Joined</span></div>
+        </div>
+        <button class="btn btn-danger btn-block" id="logoutBtn">Logout</button>
+      </section>
+
+      <section>
+        <div class="form-box wide" style="margin-bottom:1.5rem">
+          <h2>Edit name</h2>
+          <p class="sub">This also updates the author name on your blogs.</p>
+          <div id="nameMsg" class="msg"></div>
+          <form id="nameForm">
+            <div class="form-group">
+              <label for="name">Name</label>
+              <input type="text" id="name" name="name" required />
+            </div>
+            <button type="submit" class="btn">Save name</button>
+          </form>
+        </div>
+
+        <div class="form-box wide">
+          <h2>Change password</h2>
+          <p class="sub">Use at least 6 characters.</p>
+          <div id="pwMsg" class="msg"></div>
+          <form id="pwForm">
+            <div class="form-group">
+              <label for="currentPassword">Current password</label>
+              <input type="password" id="currentPassword" name="currentPassword" required />
+            </div>
+            <div class="form-group">
+              <label for="newPassword">New password</label>
+              <input type="password" id="newPassword" name="newPassword" required />
+            </div>
+            <div class="form-group">
+              <label for="confirmPassword">Confirm new password</label>
+              <input type="password" id="confirmPassword" name="confirmPassword" required />
+            </div>
+            <button type="submit" class="btn">Change password</button>
+          </form>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer><div class="container">© 2026 BlogSpace · Codomax Internship Project</div></footer>
+  <script src="js/main.js"></script>
+</body>
+</html>

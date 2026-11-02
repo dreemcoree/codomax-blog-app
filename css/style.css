@@ -415,22 +415,14 @@ footer {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 
-/* ===== Search + category filter ===== */
-.filters { display: flex; gap: 1rem; margin-bottom: 1.8rem; flex-wrap: wrap; }
-.filters input { flex: 1; min-width: 220px; }
-.filters select { width: 220px; }
-td a:not(.btn):hover { color: var(--accent); }
-td .btn-outline { margin-left: 0; margin-right: 0.4rem; }
+/* ===== Module 4 + 5 additions ===== */
 
-/* ===== Upgrades: paste at the BOTTOM of css/style.css ===== */
-
-/* Search + category filter (Module 4) */
+/* Search + category filter */
 .filters { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
 .filters input { flex: 1; min-width: 220px; }
 .filters select { width: 220px; }
 td a:not(.btn):hover { color: var(--accent); }
 td .btn-outline { margin-left: 0; margin-right: 0.4rem; }
-
 /* Single blog page */
 .back-link { display: inline-block; margin-bottom: 1.5rem; color: var(--muted); transition: color 0.3s; }
 .back-link:hover { color: var(--accent); }
@@ -464,3 +456,26 @@ td .btn-outline { margin-left: 0; margin-right: 0.4rem; }
 .toast.success { border-left: 4px solid #22c55e; }
 .toast.error { border-left: 4px solid var(--primary); }
 .toast.hide { opacity: 0; transform: translateY(10px); }
+
+/* ===== Module 5: Profile page ===== */
+.profile-grid { display: grid; grid-template-columns: 300px 1fr; gap: 1.8rem; align-items: start; }
+.profile-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+  padding: 2rem 1.5rem; text-align: center; animation: fadeUp 0.8s var(--ease) both;
+}
+.avatar {
+  width: 84px; height: 84px; margin: 0 auto 1rem; border-radius: 50%;
+  display: grid; place-items: center; font-size: 2.2rem; font-weight: 700; color: #fff;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  box-shadow: 0 10px 30px rgba(225, 29, 46, 0.35);
+}
+.profile-card h2 { font-size: 1.5rem; margin-bottom: 0.2rem; }
+.profile-email { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.4rem; word-break: break-all; }
+.profile-stats { display: flex; justify-content: space-around; margin-bottom: 1.6rem; padding: 1rem 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.profile-stats strong { display: block; font-size: 1.1rem; color: var(--accent); }
+.profile-stats span { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+.profile-grid .form-box { width: 100%; }
+
+@media (max-width: 768px) {
+  .profile-grid { grid-template-columns: 1fr; }
+}
