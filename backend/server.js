@@ -19,8 +19,16 @@ app.use(cors());
 app.use(express.json());
 
 // ----- Connect to MongoDB -----
+// Clean the value: remove spaces, quotes and an accidental "MONGO_URI=" at the start
+const mongoUri = (process.env.MONGO_URI || "")
+  .trim()
+  .replace(/^MONGO_URI=/, "")
+  .replace(/^["']|["']$/g, "")
+  .trim();
+console.log("MONGO_URI starts with:", JSON.stringify(mongoUri.slice(0, 14)));
+
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(mongoUri)
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.log("MongoDB error:", err.message));
 
@@ -69,6 +77,7 @@ app.post("/api/register", async (req, res) => {
     await User.create({ name, email: cleanEmail, password: hashPassword(password) });
     res.status(201).json({ message: "Registered successfully." });
   } catch (err) {
+    console.error("Server error:", err.message);
     res.status(500).json({ message: "Server error." });
   }
 });
@@ -85,6 +94,7 @@ app.post("/api/login", async (req, res) => {
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
     res.json({ message: "Login successful.", token, user: { id: user._id, name: user.name, email: user.email } });
   } catch (err) {
+    console.error("Server error:", err.message);
     res.status(500).json({ message: "Server error." });
   }
 });
@@ -101,6 +111,7 @@ app.get("/api/blogs", async (req, res) => {
     const blogs = await Blog.find(filter).sort({ createdAt: 1 });
     res.json(blogs.map(formatBlog));
   } catch (err) {
+    console.error("Server error:", err.message);
     res.status(500).json({ message: "Server error." });
   }
 });
@@ -113,6 +124,7 @@ app.get("/api/blogs/mine", auth, async (req, res) => {
     const blogs = await Blog.find({ author: req.userId }).sort({ createdAt: 1 });
     res.json(blogs.map(formatBlog));
   } catch (err) {
+    console.error("Server error:", err.message);
     res.status(500).json({ message: "Server error." });
   }
 });
@@ -125,6 +137,7 @@ app.get("/api/blogs/:id", async (req, res) => {
     if (!blog) return res.status(404).json({ message: "Blog not found." });
     res.json(formatBlog(blog));
   } catch (err) {
+    console.error("Server error:", err.message);
     res.status(500).json({ message: "Server error." });
   }
 });
@@ -141,6 +154,7 @@ app.post("/api/blogs", auth, async (req, res) => {
     const blog = await Blog.create({ title, category, content, author: author._id, authorName: author.name });
     res.status(201).json({ message: "Blog created.", blog: formatBlog(blog) });
   } catch (err) {
+    console.error("Server error:", err.message);
     res.status(500).json({ message: "Server error." });
   }
 });
@@ -162,6 +176,7 @@ app.put("/api/blogs/:id", auth, async (req, res) => {
     await blog.save();
     res.json({ message: "Blog updated.", blog: formatBlog(blog) });
   } catch (err) {
+    console.error("Server error:", err.message);
     res.status(500).json({ message: "Server error." });
   }
 });
@@ -177,6 +192,7 @@ app.delete("/api/blogs/:id", auth, async (req, res) => {
     await blog.deleteOne();
     res.json({ message: "Blog deleted." });
   } catch (err) {
+    console.error("Server error:", err.message);
     res.status(500).json({ message: "Server error." });
   }
 });
@@ -189,6 +205,7 @@ app.get("/api/me", auth, async (req, res) => {
     const blogCount = await Blog.countDocuments({ author: user._id });
     res.json({ id: user._id, name: user.name, email: user.email, joined: user.createdAt.toISOString().slice(0, 10), blogCount });
   } catch (err) {
+    console.error("Server error:", err.message);
     res.status(500).json({ message: "Server error." });
   }
 });
@@ -214,6 +231,7 @@ app.put("/api/me", auth, async (req, res) => {
     await user.save();
     res.json({ message: "Profile updated.", user: { id: user._id, name: user.name, email: user.email } });
   } catch (err) {
+    console.error("Server error:", err.message);
     res.status(500).json({ message: "Server error." });
   }
 });
