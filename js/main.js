@@ -4,7 +4,7 @@
 const IS_LOCAL = ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
 const API_URL = IS_LOCAL
   ? "http://localhost:5000/api"                       // your computer
-  : "https://YOUR-BACKEND-NAME.onrender.com/api";     // deployed site: change after deploying the backend
+  : "https://codomax-blog-app.onrender.com/api";     // deployed site: change after deploying the backend
 
 // ----- Session helpers (token + user are kept in the browser) -----
 function getUser() {
