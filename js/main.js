@@ -1,7 +1,10 @@
 // ===== main.js — shared by all pages (Module 05: JWT login) =====
 
 // Where your backend runs. When you deploy the backend later, change only this line.
-const API_URL = "http://localhost:5000/api";
+const IS_LOCAL = ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
+const API_URL = IS_LOCAL
+  ? "http://localhost:5000/api"                       // your computer
+  : "https://YOUR-BACKEND-NAME.onrender.com/api";     // deployed site: change after deploying the backend
 
 // ----- Session helpers (token + user are kept in the browser) -----
 function getUser() {
@@ -74,11 +77,15 @@ async function api(path, options = {}) {
   const token = getToken();
   if (token) headers.Authorization = "Bearer " + token;
 
+  // Free hosting sleeps when unused: tell the user if the server is slow to answer
+  const wakeTimer = setTimeout(() => toast("Server is waking up, please wait a few seconds...", "success"), 4000);
   let res;
   try {
     res = await fetch(API_URL + path, { ...options, headers });
   } catch {
-    throw new Error("Cannot reach the server. Is the backend running (npm start)?");
+    throw new Error("Cannot reach the server. Please try again in a moment.");
+  } finally {
+    clearTimeout(wakeTimer);
   }
   const data = await res.json().catch(() => ({}));
 
